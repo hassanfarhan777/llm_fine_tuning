@@ -7,6 +7,7 @@ from transformers import pipeline
 from sentence_transformers import SentenceTransformer, util
 from IPython.display import display, HTML
 import time
+import psutil
 
 
 class tools_local():
@@ -64,6 +65,40 @@ class tools_local():
         
         return result
 
+    def resources(self):
+        
+        # Get the number of GPUs
+        num_gpus = len(tf.config.list_physical_devices('GPU'))
+        print(f"Number of GPUs available: {num_gpus}")
+
+        # List GPU details
+        gpus = tf.config.list_physical_devices('GPU')
+        for gpu in gpus:
+            print(gpu)
+
+        # Get CPU information
+        print(f"CPU Count: {psutil.cpu_count(logical=True)}")
+        print(f"CPU Usage (%): {psutil.cpu_percent(interval=1)}")
+
+        # Get RAM information
+        virtual_memory = psutil.virtual_memory()
+        print(f"Total RAM: {virtual_memory.total / (1024 ** 3):.2f} GB")
+        print(f"Available RAM: {virtual_memory.available / (1024 ** 3):.2f} GB")
+        print(f"RAM Usage (%): {virtual_memory.percent}")
+
+        # Disk Usage (Optional)
+        disk_usage = psutil.disk_usage('/')
+        print(f"Total Disk Space: {disk_usage.total / (1024 ** 3):.2f} GB")
+        print(f"Available Disk Space: {disk_usage.free / (1024 ** 3):.2f} GB")
+
+        # Get current device information (if using CUDA with PyTorch)
+        if torch.cuda.is_available():
+            current_device = torch.cuda.current_device()
+            print(f"Current device ID: {current_device}")
+            print(f"Current device name: {torch.cuda.get_device_name(current_device)}")
+        else:
+            print("No CUDA-enabled device found.")
+
 
 
 
@@ -94,7 +129,7 @@ class llm_tools():
             "role": "system",
             "content": "You are an assistant that compares prompts to find the one which most likely generated the provided code"
         }
-        
+                                        
         # User message that provides the code and paragraphs
         user_message_content = f"""
         Here is the Python code snippet:
@@ -139,6 +174,9 @@ class llm_tools():
             - -1 indicates maximum dissimilarity in terms of the embedding space.
             
         """
+        # If the model is wrapped in DataParallel, use .module to access the actual model
+        if isinstance(model, torch.nn.DataParallel):
+            model = model.module
         
         embedding1 = model.encode(text1, convert_to_tensor=True)
         embedding2 = model.encode(text2, convert_to_tensor=True)
@@ -148,10 +186,9 @@ class llm_tools():
 
 
     
-    def similarity_ranking(self,data, model, open_gen, top_n):
+    def similarity_ranking(self,data, model, open_gen, top_n): # Make sure the model here is 'all-MiniLM-L6-v2' and not gpt-4o-mini
         """
-        Computes the similarity scores between a generated text and a list of queries, 
-        returning the top N most similar entries.
+        Returns the top N most similar entries according to cosine similarity.
 
         Args:
             data (list of dict): A list of dictionaries containing queries to compare against.
@@ -312,4 +349,37 @@ class llm_tools():
         }
 
         return [system_message, user_message]
+
+
+    def explainer(self, formatted_code_string, model="gpt-4o-mini", max_tokens=150, temperature=0.01):
+        """
+        Prepares messages for the Chat API and sends a request.
+
+        Args:
+            formatted_code_string (str): The code snippet to be analyzed.
+            model (str): The model to use for the API call. Defaults to "gpt-4o-mini".
+            max_tokens (int): The maximum number of tokens in the response. Defaults to 150.
+            temperature (float): Sampling temperature. Defaults to 0.01.
+
+        Returns:
+            dict: The response from the OpenAI API, or None if an error occurs.
+        """
+        # Prepare the messages for the Chat API
+        messages = [
+            {"role": "user", "content": f"Explain the purpose of this code without getting into technical details. Here is the code: {formatted_code_string}"}
+        ]
+
+        # Make the API call
+        try:
+            response = openai.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature
+            )
+            return response
+        except Exception as e:
+            print(f"Error occurred while making the API call: {e}")
+            return None
+
 
