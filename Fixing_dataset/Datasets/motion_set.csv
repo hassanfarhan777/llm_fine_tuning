@@ -1,0 +1,539 @@
+0,1
+Can you help me create a 3D scene using Manim that features a circle and 3D axes? I want the camera to start at a specific orientation and then perform a rotation illusion for a short duration before stopping. The rotation should be smooth and at a moderate speed. Could you provide the code for that?,"from manim import *
+
+class ThreeDCameraIllusionRotation(ThreeDScene):
+    def construct(self):
+        axes = ThreeDAxes()
+        circle=Circle()
+        self.set_camera_orientation(phi=75 * DEGREES, theta=30 * DEGREES)
+        self.add(circle,axes)
+        self.begin_3dillusion_camera_rotation(rate=2)
+        self.wait(PI/2)
+        self.stop_3dillusion_camera_rotation()
+"
+"Can you help me create a Manim scene that starts with a title and a mathematical equation displayed using LaTeX? I want the title to transform into a new phrase after fading out the equation. Then, I’d like to introduce a grid with a title on top of it, and animate the grid's creation. Finally, I want to apply a non-linear transformation to the grid and change the title again to reflect this transformation. Please include all the necessary imports and structure the code properly.","from manim import *
+
+class OpeningManim(Scene):
+    def construct(self):
+        title = Tex(r""This is some \LaTeX"")
+        basel = MathTex(r""\sum_{n=1}^\infty \frac{1}{n^2} = \frac{\pi^2}{6}"")
+        VGroup(title, basel).arrange(DOWN)
+        self.play(
+            Write(title),
+            FadeIn(basel, shift=DOWN),
+        )
+        self.wait()
+
+        transform_title = Tex(""That was a transform"")
+        transform_title.to_corner(UP + LEFT)
+        self.play(
+            Transform(title, transform_title),
+            LaggedStart(*[FadeOut(obj, shift=DOWN) for obj in basel]),
+        )
+        self.wait()
+
+        grid = NumberPlane()
+        grid_title = Tex(""This is a grid"", font_size=72)
+        grid_title.move_to(transform_title)
+
+        self.add(grid, grid_title)  # Make sure title is on top of grid
+        self.play(
+            FadeOut(title),
+            FadeIn(grid_title, shift=UP),
+            Create(grid, run_time=3, lag_ratio=0.1),
+        )
+        self.wait()
+
+        grid_transform_title = Tex(
+            r""That was a non-linear function \\ applied to the grid""
+        )
+        grid_transform_title.move_to(grid_title, UL)
+        grid.prepare_for_nonlinear_transform()
+        self.play(
+            grid.animate.apply_function(
+                lambda p: p
+                          + np.array(
+                    [
+                        np.sin(p[1]),
+                        np.sin(p[0]),
+                        0,
+                    ]
+                )
+            ),
+            run_time=3,
+        )
+        self.wait()
+        self.play(Transform(grid_title, grid_transform_title))
+        self.wait()
+"
+"Can you help me create a Manim animation that illustrates the relationship between a sine curve and a unit circle? I want to show the x and y axes, draw a unit circle, and animate a dot moving around the circle while simultaneously drawing the corresponding sine curve. The x-axis should have labels for multiples of π, and the sine curve should be drawn in real-time as the dot moves. Please include all necessary functions to set up the scene, draw the axes, the circle, and the animations.","from manim import *
+
+class SineCurveUnitCircle(Scene):
+    # contributed by heejin_park, https://infograph.tistory.com/230
+    def construct(self):
+        self.show_axis()
+        self.show_circle()
+        self.move_dot_and_draw_curve()
+        self.wait()
+
+    def show_axis(self):
+        x_start = np.array([-6,0,0])
+        x_end = np.array([6,0,0])
+
+        y_start = np.array([-4,-2,0])
+        y_end = np.array([-4,2,0])
+
+        x_axis = Line(x_start, x_end)
+        y_axis = Line(y_start, y_end)
+
+        self.add(x_axis, y_axis)
+        self.add_x_labels()
+
+        self.origin_point = np.array([-4,0,0])
+        self.curve_start = np.array([-3,0,0])
+
+    def add_x_labels(self):
+        x_labels = [
+            MathTex(r""\pi""), MathTex(r""2 \pi""),
+            MathTex(r""3 \pi""), MathTex(r""4 \pi""),
+        ]
+
+        for i in range(len(x_labels)):
+            x_labels[i].next_to(np.array([-1 + 2*i, 0, 0]), DOWN)
+            self.add(x_labels[i])
+
+    def show_circle(self):
+        circle = Circle(radius=1)
+        circle.move_to(self.origin_point)
+        self.add(circle)
+        self.circle = circle
+
+    def move_dot_and_draw_curve(self):
+        orbit = self.circle
+        origin_point = self.origin_point
+
+        dot = Dot(radius=0.08, color=YELLOW)
+        dot.move_to(orbit.point_from_proportion(0))
+        self.t_offset = 0
+        rate = 0.25
+
+        def go_around_circle(mob, dt):
+            self.t_offset += (dt * rate)
+            # print(self.t_offset)
+            mob.move_to(orbit.point_from_proportion(self.t_offset % 1))
+
+        def get_line_to_circle():
+            return Line(origin_point, dot.get_center(), color=BLUE)
+
+        def get_line_to_curve():
+            x = self.curve_start[0] + self.t_offset * 4
+            y = dot.get_center()[1]
+            return Line(dot.get_center(), np.array([x,y,0]), color=YELLOW_A, stroke_width=2 )
+
+
+        self.curve = VGroup()
+        self.curve.add(Line(self.curve_start,self.curve_start))
+        def get_curve():
+            last_line = self.curve[-1]
+            x = self.curve_start[0] + self.t_offset * 4
+            y = dot.get_center()[1]
+            new_line = Line(last_line.get_end(),np.array([x,y,0]), color=YELLOW_D)
+            self.curve.add(new_line)
+
+            return self.curve
+
+        dot.add_updater(go_around_circle)
+
+        origin_to_circle_line = always_redraw(get_line_to_circle)
+        dot_to_curve_line = always_redraw(get_line_to_curve)
+        sine_curve_line = always_redraw(get_curve)
+
+        self.add(dot)
+        self.add(orbit, origin_to_circle_line, dot_to_curve_line, sine_curve_line)
+        self.wait(8.5)
+
+        dot.remove_updater(go_around_circle)
+"
+"Can you help me create a Manim animation where I have two lines forming an angle? I want one of the lines to rotate around a fixed point, and I would like to visualize the angle between them. Additionally, I want to display the angle measurement with a label that moves along with the angle as it changes. The angle should start at 110 degrees, then animate to 40 degrees, increase to 180 degrees, change color to red briefly, and finally rotate to 350 degrees. Please include all necessary components like the angle tracker and updaters for the lines and the angle label.","from manim import *
+
+class MovingAngle(Scene):
+    def construct(self):
+        rotation_center = LEFT
+
+        theta_tracker = ValueTracker(110)
+        line1 = Line(LEFT, RIGHT)
+        line_moving = Line(LEFT, RIGHT)
+        line_ref = line_moving.copy()
+        line_moving.rotate(
+            theta_tracker.get_value() * DEGREES, about_point=rotation_center
+        )
+        a = Angle(line1, line_moving, radius=0.5, other_angle=False)
+        tex = MathTex(r""\theta"").move_to(
+            Angle(
+                line1, line_moving, radius=0.5 + 3 * SMALL_BUFF, other_angle=False
+            ).point_from_proportion(0.5)
+        )
+
+        self.add(line1, line_moving, a, tex)
+        self.wait()
+
+        line_moving.add_updater(
+            lambda x: x.become(line_ref.copy()).rotate(
+                theta_tracker.get_value() * DEGREES, about_point=rotation_center
+            )
+        )
+
+        a.add_updater(
+            lambda x: x.become(Angle(line1, line_moving, radius=0.5, other_angle=False))
+        )
+        tex.add_updater(
+            lambda x: x.move_to(
+                Angle(
+                    line1, line_moving, radius=0.5 + 3 * SMALL_BUFF, other_angle=False
+                ).point_from_proportion(0.5)
+            )
+        )
+
+        self.play(theta_tracker.animate.set_value(40))
+        self.play(theta_tracker.animate.increment_value(140))
+        self.play(tex.animate.set_color(RED), run_time=0.5)
+        self.play(theta_tracker.animate.set_value(350))
+"
+"Can you help me create a 3D animation using Manim where I have a circle and 3D axes? I want the camera to start at a specific angle and then rotate around the scene slowly. After some time, I’d like the camera to stop rotating and maintain its position for a moment before finishing the animation.","from manim import *
+
+class ThreeDCameraRotation(ThreeDScene):
+    def construct(self):
+        axes = ThreeDAxes()
+        circle=Circle()
+        self.set_camera_orientation(phi=75 * DEGREES, theta=30 * DEGREES)
+        self.add(circle,axes)
+        self.begin_ambient_camera_rotation(rate=0.1)
+        self.wait()
+        self.stop_ambient_camera_rotation()
+        self.move_camera(phi=75 * DEGREES, theta=30 * DEGREES)
+        self.wait()
+"
+"Can you help me create a simple animation using Manim where I have two dots that can move independently along the x and y axes? I want to connect them with a line that updates its position as the dots move. The first dot should be blue, the second green, and the line should be red. I'd like to see the first dot move to the right and the second dot move up in the animation.","from manim import *
+
+class MovingDots(Scene):
+    def construct(self):
+        d1,d2=Dot(color=BLUE),Dot(color=GREEN)
+        dg=VGroup(d1,d2).arrange(RIGHT,buff=1)
+        l1=Line(d1.get_center(),d2.get_center()).set_color(RED)
+        x=ValueTracker(0)
+        y=ValueTracker(0)
+        d1.add_updater(lambda z: z.set_x(x.get_value()))
+        d2.add_updater(lambda z: z.set_y(y.get_value()))
+        l1.add_updater(lambda z: z.become(Line(d1.get_center(),d2.get_center())))
+        self.add(d1,d2,l1)
+        self.play(x.animate.set_value(5))
+        self.play(y.animate.set_value(4))
+        self.wait()
+"
+"Can you help me create a Manim scene that demonstrates a zooming effect? I want to use a `ZoomedScene` class where I can display an image and a dot. The scene should include a zoomed camera view that highlights the dot, and I want to animate the zooming in and out of the display. Additionally, I would like to have some text labels that indicate the frame and the zoomed camera. The zoomed display should have a background rectangle, and I want to include some scaling animations for both the frame and the zoomed display. Finally, please ensure that the animations are smooth and visually appealing.","from manim import *
+
+class MovingZoomedSceneAround(ZoomedScene):
+# contributed by TheoremofBeethoven, www.youtube.com/c/TheoremofBeethoven
+    def __init__(self, **kwargs):
+        ZoomedScene.__init__(
+            self,
+            zoom_factor=0.3,
+            zoomed_display_height=1,
+            zoomed_display_width=6,
+            image_frame_stroke_width=20,
+            zoomed_camera_config={
+                ""default_frame_stroke_width"": 3,
+                },
+            **kwargs
+        )
+
+    def construct(self):
+        dot = Dot().shift(UL * 2)
+        image = ImageMobject(np.uint8([[0, 100, 30, 200],
+                                       [255, 0, 5, 33]]))
+        image.height = 7
+        frame_text = Text(""Frame"", color=PURPLE, font_size=67)
+        zoomed_camera_text = Text(""Zoomed camera"", color=RED, font_size=67)
+
+        self.add(image, dot)
+        zoomed_camera = self.zoomed_camera
+        zoomed_display = self.zoomed_display
+        frame = zoomed_camera.frame
+        zoomed_display_frame = zoomed_display.display_frame
+
+        frame.move_to(dot)
+        frame.set_color(PURPLE)
+        zoomed_display_frame.set_color(RED)
+        zoomed_display.shift(DOWN)
+
+        zd_rect = BackgroundRectangle(zoomed_display, fill_opacity=0, buff=MED_SMALL_BUFF)
+        self.add_foreground_mobject(zd_rect)
+
+        unfold_camera = UpdateFromFunc(zd_rect, lambda rect: rect.replace(zoomed_display))
+
+        frame_text.next_to(frame, DOWN)
+
+        self.play(Create(frame), FadeIn(frame_text, shift=UP))
+        self.activate_zooming()
+
+        self.play(self.get_zoomed_display_pop_out_animation(), unfold_camera)
+        zoomed_camera_text.next_to(zoomed_display_frame, DOWN)
+        self.play(FadeIn(zoomed_camera_text, shift=UP))
+        # Scale in        x   y  z
+        scale_factor = [0.5, 1.5, 0]
+        self.play(
+            frame.animate.scale(scale_factor),
+            zoomed_display.animate.scale(scale_factor),
+            FadeOut(zoomed_camera_text),
+            FadeOut(frame_text)
+        )
+        self.wait()
+        self.play(ScaleInPlace(zoomed_display, 2))
+        self.wait()
+        self.play(frame.animate.shift(2.5 * DOWN))
+        self.wait()
+        self.play(self.get_zoomed_display_pop_out_animation(), unfold_camera, rate_func=lambda t: smooth(1 - t))
+        self.play(Uncreate(zoomed_display_frame), FadeOut(frame))
+        self.wait()
+"
+"Can you help me create a Manim animation where a camera follows a moving dot along a sine wave graph? I want the camera to start at a certain position, then zoom in and move to the dot as it travels along the curve. Additionally, I’d like to have two static dots at the start and end of the graph, and the moving dot should change its position based on the sine function. Could you provide the code for this?","from manim import *
+
+class FollowingGraphCamera(MovingCameraScene):
+    def construct(self):
+        self.camera.frame.save_state()
+
+        # create the axes and the curve
+        ax = Axes(x_range=[-1, 10], y_range=[-1, 10])
+        graph = ax.plot(lambda x: np.sin(x), color=BLUE, x_range=[0, 3 * PI])
+
+        # create dots based on the graph
+        moving_dot = Dot(ax.i2gp(graph.t_min, graph), color=ORANGE)
+        dot_1 = Dot(ax.i2gp(graph.t_min, graph))
+        dot_2 = Dot(ax.i2gp(graph.t_max, graph))
+
+        self.add(ax, graph, dot_1, dot_2, moving_dot)
+        self.play(self.camera.frame.animate.scale(0.5).move_to(moving_dot))
+
+        def update_curve(mob):
+            mob.move_to(moving_dot.get_center())
+
+        self.camera.frame.add_updater(update_curve)
+        self.play(MoveAlongPath(moving_dot, graph, rate_func=linear))
+        self.camera.frame.remove_updater(update_curve)
+
+        self.play(Restore(self.camera.frame))
+"
+"Can you help me create a Manim scene where I have a group of dots that I want to move to a specific destination? I’d like the group to consist of four dots, with the third dot being red. The destination should be a yellow dot located at coordinates (4, 3, 0). Once everything is set up, I want to animate the movement of the group so that it shifts to the position of the yellow dot, based on the position of the red dot in the group. Finally, I’d like to pause for half a second after the animation.","from manim import *
+
+class MovingGroupToDestination(Scene):
+    def construct(self):
+        group = VGroup(Dot(LEFT), Dot(ORIGIN), Dot(RIGHT, color=RED), Dot(2 * RIGHT)).scale(1.4)
+        dest = Dot([4, 3, 0], color=YELLOW)
+        self.add(group, dest)
+        self.play(group.animate.shift(dest.get_center() - group[2].get_center()))
+        self.wait(0.5)
+"
+"Can you help me create a Manim animation that illustrates the product rule of differentiation? I want to display the equation \(\frac{d}{dx}f(x)g(x) = f(x)\frac{d}{dx}g(x) + g(x)\frac{d}{dx}f(x)\) with the middle terms highlighted one at a time. Start by writing the entire equation, then create a box around the second term, pause for a moment, and finally replace that box with a box around the fourth term. Make sure the transitions are smooth and visually appealing!","from manim import *
+
+class MovingFrameBox(Scene):
+    def construct(self):
+        text=MathTex(
+            ""\\frac{d}{dx}f(x)g(x)="",""f(x)\\frac{d}{dx}g(x)"",""+"",
+            ""g(x)\\frac{d}{dx}f(x)""
+        )
+        self.play(Write(text))
+        framebox1 = SurroundingRectangle(text[1], buff = .1)
+        framebox2 = SurroundingRectangle(text[3], buff = .1)
+        self.play(
+            Create(framebox1),
+        )
+        self.wait()
+        self.play(
+            ReplacementTransform(framebox1,framebox2),
+        )
+        self.wait()
+"
+"Can you help me create a Manim animation where a dot moves in a circular path while leaving a trace behind it? I want the dot to rotate around a point and then shift upwards and to the left, all while showing the path it has taken.","from manim import *
+
+class PointWithTrace(Scene):
+    def construct(self):
+        path = VMobject()
+        dot = Dot()
+        path.set_points_as_corners([dot.get_center(), dot.get_center()])
+        def update_path(path):
+            previous_path = path.copy()
+            previous_path.add_points_as_corners([dot.get_center()])
+            path.become(previous_path)
+        path.add_updater(update_path)
+        self.add(path, dot)
+        self.play(Rotating(dot, radians=PI, about_point=RIGHT, run_time=2))
+        self.wait()
+        self.play(dot.animate.shift(UP))
+        self.play(dot.animate.shift(LEFT))
+        self.wait()
+"
+"Can you help me create a Manim scene where a yellow line rotates around the origin in one direction for a couple of seconds, then switches to rotate in the opposite direction for another couple of seconds? I want to keep a static white line as a reference. Also, make sure to use updaters to control the rotation smoothly.","from manim import *
+
+class RotationUpdater(Scene):
+    def construct(self):
+        def updater_forth(mobj, dt):
+            mobj.rotate_about_origin(dt)
+        def updater_back(mobj, dt):
+            mobj.rotate_about_origin(-dt)
+        line_reference = Line(ORIGIN, LEFT).set_color(WHITE)
+        line_moving = Line(ORIGIN, LEFT).set_color(YELLOW)
+        line_moving.add_updater(updater_forth)
+        self.add(line_reference, line_moving)
+        self.wait(2)
+        line_moving.remove_updater(updater_forth)
+        line_moving.add_updater(updater_back)
+        self.wait(2)
+        line_moving.remove_updater(updater_back)
+        self.wait(0.5)
+"
+"Can you help me create a Manim scene that demonstrates various boolean operations using ellipses? I want to show the intersection, union, exclusion, and difference of two overlapping ellipses. Each operation should be visually distinct with different colors and should include labels for each operation. The scene should start with the two ellipses appearing on the screen, followed by the boolean operations being animated and labeled accordingly.","from manim import *
+
+class BooleanOperations(Scene):
+    def construct(self):
+        ellipse1 = Ellipse(
+            width=4.0, height=5.0, fill_opacity=0.5, color=BLUE, stroke_width=10
+        ).move_to(LEFT)
+        ellipse2 = ellipse1.copy().set_color(color=RED).move_to(RIGHT)
+        bool_ops_text = MarkupText(""<u>Boolean Operation</u>"").next_to(ellipse1, UP * 3)
+        ellipse_group = Group(bool_ops_text, ellipse1, ellipse2).move_to(LEFT * 3)
+        self.play(FadeIn(ellipse_group))
+
+        i = Intersection(ellipse1, ellipse2, color=GREEN, fill_opacity=0.5)
+        self.play(i.animate.scale(0.25).move_to(RIGHT * 5 + UP * 2.5))
+        intersection_text = Text(""Intersection"", font_size=23).next_to(i, UP)
+        self.play(FadeIn(intersection_text))
+
+        u = Union(ellipse1, ellipse2, color=ORANGE, fill_opacity=0.5)
+        union_text = Text(""Union"", font_size=23)
+        self.play(u.animate.scale(0.3).next_to(i, DOWN, buff=union_text.height * 3))
+        union_text.next_to(u, UP)
+        self.play(FadeIn(union_text))
+
+        e = Exclusion(ellipse1, ellipse2, color=YELLOW, fill_opacity=0.5)
+        exclusion_text = Text(""Exclusion"", font_size=23)
+        self.play(e.animate.scale(0.3).next_to(u, DOWN, buff=exclusion_text.height * 3.5))
+        exclusion_text.next_to(e, UP)
+        self.play(FadeIn(exclusion_text))
+
+        d = Difference(ellipse1, ellipse2, color=PINK, fill_opacity=0.5)
+        difference_text = Text(""Difference"", font_size=23)
+        self.play(d.animate.scale(0.3).next_to(u, LEFT, buff=difference_text.height * 3.5))
+        difference_text.next_to(d, UP)
+        self.play(FadeIn(difference_text))
+"
+"Can you help me create a Manim scene that visualizes a rectangle on a set of axes? The rectangle should be defined by two corners, and I want to plot a hyperbola defined by the equation \(y = \frac{k}{x}\) where \(k\) is a constant. I would like to animate the rectangle's width changing dynamically as a value tracker updates, and also include a dot that moves along the curve of the hyperbola. The rectangle should be filled with a semi-transparent blue color and have a yellow stroke. Please include the necessary imports and structure the code properly.","from manim import *
+
+class PolygonOnAxes(Scene):
+    def get_rectangle_corners(self, bottom_left, top_right):
+        return [
+            (top_right[0], top_right[1]),
+            (bottom_left[0], top_right[1]),
+            (bottom_left[0], bottom_left[1]),
+            (top_right[0], bottom_left[1]),
+        ]
+
+    def construct(self):
+        ax = Axes(
+            x_range=[0, 10],
+            y_range=[0, 10],
+            x_length=6,
+            y_length=6,
+            axis_config={""include_tip"": False},
+        )
+
+        t = ValueTracker(5)
+        k = 25
+
+        graph = ax.plot(
+            lambda x: k / x,
+            color=YELLOW_D,
+            x_range=[k / 10, 10.0, 0.01],
+            use_smoothing=False,
+        )
+
+        def get_rectangle():
+            polygon = Polygon(
+                *[
+                    ax.c2p(*i)
+                    for i in self.get_rectangle_corners(
+                        (0, 0), (t.get_value(), k / t.get_value())
+                    )
+                ]
+            )
+            polygon.stroke_width = 1
+            polygon.set_fill(BLUE, opacity=0.5)
+            polygon.set_stroke(YELLOW_B)
+            return polygon
+
+        polygon = always_redraw(get_rectangle)
+
+        dot = Dot()
+        dot.add_updater(lambda x: x.move_to(ax.c2p(t.get_value(), k / t.get_value())))
+        dot.set_z_index(10)
+
+        self.add(ax, graph, dot)
+        self.play(Create(polygon))
+        self.play(t.animate.set_value(10))
+        self.play(t.animate.set_value(k / 10))
+        self.play(t.animate.set_value(5))
+"
+"Can you help me create a Manim animation that demonstrates the concept of finding the minimum of a quadratic function? I want to visualize the function \( f(x) = 2(x - 5)^2 \) on a graph, and I’d like to include an animated dot that moves to the minimum point of the graph as the animation progresses. Please make sure to include axes with labels for both the x and y axes, and ensure that the dot updates its position dynamically as it approaches the minimum.","from manim import *
+
+class ArgMinExample(Scene):
+    def construct(self):
+        ax = Axes(
+            x_range=[0, 10], y_range=[0, 100, 10], axis_config={""include_tip"": False}
+        )
+        labels = ax.get_axis_labels(x_label=""x"", y_label=""f(x)"")
+
+        t = ValueTracker(0)
+
+        def func(x):
+            return 2 * (x - 5) ** 2
+        graph = ax.plot(func, color=MAROON)
+
+        initial_point = [ax.coords_to_point(t.get_value(), func(t.get_value()))]
+        dot = Dot(point=initial_point)
+
+        dot.add_updater(lambda x: x.move_to(ax.c2p(t.get_value(), func(t.get_value()))))
+        x_space = np.linspace(*ax.x_range[:2],200)
+        minimum_index = func(x_space).argmin()
+
+        self.add(ax, labels, graph, dot)
+        self.play(t.animate.set_value(x_space[minimum_index]))
+        self.wait()
+"
+"Can you help me create a Manim scene where a point moves along a circle while also rotating around a specific point? I want to start with a circle and a dot, and then have the dot move along the circumference of the circle. Additionally, I’d like to include a horizontal line in the scene. The dot should grow from the center of the circle, and I want to see it transform and move smoothly along the path of the circle. Finally, I’d like the dot to rotate around a point on the line after it completes its movement along the circle. Could you provide the code for that?","from manim import *
+
+class PointMovingOnShapes(Scene):
+    def construct(self):
+        circle = Circle(radius=1, color=BLUE)
+        dot = Dot()
+        dot2 = dot.copy().shift(RIGHT)
+        self.add(dot)
+
+        line = Line([3, 0, 0], [5, 0, 0])
+        self.add(line)
+
+        self.play(GrowFromCenter(circle))
+        self.play(Transform(dot, dot2))
+        self.play(MoveAlongPath(dot, circle), run_time=2, rate_func=linear)
+        self.play(Rotating(dot, about_point=[2, 0, 0]), run_time=1.5)
+        self.wait()
+"
+"Can you help me create a simple animation using Manim where a blue square moves to the left, changes its color to orange, scales down to 30% of its size, and then rotates a little bit? I'd like to see how to structure the code for this animation.","from manim import *
+
+class MovingAround(Scene):
+    def construct(self):
+        square = Square(color=BLUE, fill_opacity=1)
+
+        self.play(square.animate.shift(LEFT))
+        self.play(square.animate.set_fill(ORANGE))
+        self.play(square.animate.scale(0.3))
+        self.play(square.animate.rotate(0.4))
+"
